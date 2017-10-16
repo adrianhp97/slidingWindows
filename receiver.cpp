@@ -26,5 +26,10 @@ class Receiver {
   	void sendMsg();
   	void recvMsg();
   	void makePacket();
-  	
+
+}
+
+int main() {
+	Receiver receiver;
+	return 0;
 }

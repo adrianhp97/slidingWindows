@@ -24,3 +24,8 @@ class Sender {
   	void makeACK();
 
 }
+
+int main() {
+	Sender sender;
+	return 0;
+}
