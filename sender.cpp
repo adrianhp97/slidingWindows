@@ -34,14 +34,14 @@ void readFileAndStore(char* filename) {
 	fin.close();
 }
 
-void readBuffer(char* filename) {
+void readBuffer(int fd, char* filename) {
 	ifstream fin(filename);	
     char temp;
     int nMsg = 0;	
 
 	fin >> temp;
 	while (!fin.eof()) {
-		if (nMsg <= 256) {
+		if (nMsg < 256) {
 			buffer[nMsg++] = temp;
 			fin >> temp;
 		}
@@ -52,6 +52,15 @@ void readBuffer(char* filename) {
 	}
 
 	fin.close();
+}
+
+void sendBuffer(int fd) {
+	int nMsg = 0;
+	while (nMsg < 256) {
+		messgModel frame(nMsg);
+		frame.setData(buffer[nMsg]); 
+		sendSingleFrame(fd, frame);
+	}
 }
 
 
