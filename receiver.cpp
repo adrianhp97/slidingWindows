@@ -16,5 +16,15 @@ class Receiver {
     struct sockaddr_storage serverStorage;
     socklen_t client_addr_size;               // client address size
     socklen_t addr_size;                      // address size
+
   
+  public:
+  	Receiver();
+  	~Receiver();
+  	void configSetting();
+  	void sendSingleMsg();
+  	void sendMsg();
+  	void recvMsg();
+  	void makePacket();
+  	
 }

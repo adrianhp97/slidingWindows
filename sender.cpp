@@ -14,4 +14,13 @@ class Sender {
     int portNum;                    // port number
     struct sockaddr_in serverAddr;  // server address
     socklen_t addr_size;            // address size
+
+  public:
+  	Sender();
+  	~Sender();
+  	void sendSingleACK();
+  	void sendACK();
+  	void recvMsg();
+  	void makeACK();
+
 }
