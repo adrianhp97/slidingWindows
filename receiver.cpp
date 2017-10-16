@@ -7,43 +7,58 @@
 #include <iostream>
 #include <fstream>
 #include <cerrno>
-
-using namespace std;
+#include <vector>
 
 #include "Model/messgModel.h"
 #include "Model/ackModel.h"
+
+using namespace std;
 
 int udpSocket;
 struct sockaddr_in myaddr;            // this address
 struct sockaddr_in remaddr;            // sender address
 socklen_t addrlen = sizeof(remaddr);  /* length of addresses */
 int SERVICE_PORT = 21234;
-char filename[100] = "receive.txt";
+char* filename = "receive.txt";
+const int WINDOW_SIZE = 4;
+int seqNum = 0;
+vector<char> buffer;
 
-void writeFileAndStore(char* filename, char msg) {
+void writeToFile(char* filename) {
 	ofstream fout;
 	fout.open(filename, fstream::app);
-    char temp;
+	
+	while (!buffer.empty()) {
+		fout << buffer.front();
+		cout << "Writing : " << buffer.front() << endl;
+		buffer.erase(buffer.begin());
+	}
+}
 
-    cout << "Writing to file" << endl;
-
-	fout << msg;
-	fout << endl;
+void storeInBuffer(char msg) {
+	buffer.push_back(msg);
+	cout << "store in buffer : " << msg << endl;
+	if (buffer.size() == BUFFER_SIZE) {
+		cout << "buffer is full, empty it with writing to file" << endl;
+		writeToFile(filename);
+	}
+	else
+	if (msg == '.') {
+		cout << "eof detected, empty the rest of data in buffer" << endl;
+		writeToFile(filename);
+	}
 }
 
 void recvMsg(int udpSocket) {
 	char msg[9];
 	//bool approved[WINDOW_SIZE+1];
 	//setAllFalse(approved, WINDOW_SIZE);
+	printf("Waiting on port %d\n", SERVICE_PORT);
 	while (true) {
-		printf("Waiting on port %d\n", SERVICE_PORT);
-		
 		int test = recvfrom(udpSocket, msg, 9, 0, (struct sockaddr *)&remaddr, &addrlen);
+		if (test > 0)
+			cout << "Received a message" << endl;
 
-		cout << "Received a message" << endl;
-
-		// if (test > 0)
-		// 	cout << "Received : ";
 		// for (int i = 0; i < 9; i++)
 		// 	printf("%02hhX ", msg[i]);
 		// cout << endl;
@@ -53,7 +68,7 @@ void recvMsg(int udpSocket) {
 		if (temp.isError())
 			cout << "Error detected -> message rejected" << endl;
 		else {
-			writeFileAndStore(filename, temp.getData());
+			storeInBuffer(temp.getData());
 			//send ACK
 			ACKModel tempAck(temp.getSeqNum()+1, 4);
 			char* msg = tempAck.setFrameFormat();

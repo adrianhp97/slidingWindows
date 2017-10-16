@@ -6,7 +6,6 @@
 #define ETX '3'       // End of Text
 #define ACK '6'       // ACK
 
-#define BUFFERSIZE 256    /* The maximum value of a byte */
-#define MAXLEN 1024     /* Maximum messages length */
+#define BUFFER_SIZE 256    /* The maximum value of a byte */
 
 #endif

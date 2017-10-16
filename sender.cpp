@@ -13,62 +13,21 @@
 #include "Model/ackModel.h"
 #include <mutex>
 #include <thread>
+#include <chrono>
+#include <vector>
 
 using namespace std;
 
-int clientSocket;
-int portNum;                    // port number
+int fd; //socket UDP
+int SERVICE_PORT = 21234;   //port receiver
+char* server = "127.0.0.1";   //receiver's address
+char* filename = "test.txt";
 struct sockaddr_in myaddr, remaddr;
-char* dataFromFile;
 const int WINDOW_SIZE = 4;
 int seqNum = 0;
-char buffer[256];
+vector<char> buffer;
 
-void readFileAndStore(char* filename) {
-	ifstream fin(filename);	
-    char temp;
-    int nMsg = 0;	
-
-	fin >> temp;
-	while (!fin.eof()) {
-		dataFromFile[nMsg++] = temp;
-		fin >> temp;
-	}
-
-	fin.close();
-}
-
-void readBuffer(int fd, char* filename) {
-	ifstream fin(filename);	
-    char temp;
-    int nMsg = 0;	
-
-	fin >> temp;
-	while (!fin.eof()) {
-		if (nMsg < 256) {
-			buffer[nMsg++] = temp;
-			fin >> temp;
-		}
-		else {
-			sendBuffer(buffer);
-			nMsg = 0;
-		}
-	}
-
-	fin.close();
-}
-
-void sendBuffer(int fd) {
-	int nMsg = 0;
-	while (nMsg < 256) {
-		messgModel frame(nMsg);
-		frame.setData(buffer[nMsg]); 
-		sendSingleFrame(fd, frame);
-	}
-}
-
-
-void sendSingleFrame(int fd, messgModel frame) {
+void sendSingleFrame(messgModel frame) {
 	char* msg = frame.setFrameFormat();
 	// for (int i = 0; i < strlen(msg); i++)
 	// 	cout << msg[i];
@@ -85,11 +44,52 @@ void sendSingleFrame(int fd, messgModel frame) {
 	// 	cout << "sending succeded" << endl;	
 }
 
+void sendBuffer() {
+    // mtx.lock();
+    while (!buffer.empty()) {
+    	int size = (buffer.size() >= 4) ? WINDOW_SIZE : buffer.size();
+    	for (int i = 0; i < size; i++) {
+    		sleep(1);
+	    	messgModel sendThis(seqNum++);
+	    	sendThis.setData(buffer.front()); 
+			sendSingleFrame(sendThis);
+			buffer.erase(buffer.begin());
+		}
+    } 
+	// mtx.unlock();
+}
 
-void recvSign(int clientSocket) {
+void readToBuffer(char* filename) {
+	ifstream fin(filename);	
+    char temp;	
+
+    cout << "Filling buffer with data ..." << endl;
+	fin >> temp;
+	while (!fin.eof()) {
+		sleep(1);
+		if (buffer.size() <= BUFFER_SIZE) {
+			printf("read : %c\n", temp);
+			buffer.push_back(temp);
+			fin >> temp;
+		}
+		else {
+			cout << "Buffer full, emptying buffer by transmitting the data" << endl;
+			sendBuffer();
+		}
+	}
+	if (!buffer.empty()) {
+		cout << "Transmitting the rest of buffer data";
+		sendBuffer();
+	}
+
+	fin.close();
+}
+
+void recvSign() {
   while(1) {
+  	sleep(1);
   	char* sign = new char [7];
-    recvfrom(clientSocket, sign, 7, 0, NULL, NULL);
+    recvfrom(fd, sign, 7, 0, NULL, NULL);
     ACKModel frame(sign);
     // frame.printContent();
  	// timeBuffer.erase(timeBuffer.begin());
@@ -97,26 +97,7 @@ void recvSign(int clientSocket) {
   }
 }
 
-void sendtoclient(int udpSocket) {
-    // fillBuffer();
-    
-    // mtx.lock();
-    for (int i = 0; i < WINDOW_SIZE; i++) {
-    	messgModel sendThis(seqNum++);
-    	sendThis.setData(dataFromFile[i]); 
-		sendSingleFrame(udpSocket, sendThis);
-		// buffer.erase(buffer.begin());
-	}
-	// mtx.unlock();
-}
-
-
 int main() {
-	int fd;
-	dataFromFile = new char [1000];
-	int SERVICE_PORT = 21234;
-	char *server = "127.0.0.1";
-
 	if ((fd = socket(PF_INET, SOCK_DGRAM, 0))==-1)
 		printf("socket created\n");
 
@@ -140,9 +121,8 @@ int main() {
 		exit(1);
 	}
 
-	readFileAndStore("test.txt");
-	thread th1(recvSign, fd);
-	thread th2(sendtoclient, fd);
+	thread th1(recvSign);
+	thread th2(readToBuffer, filename);
 
 	th1.join();
 	th2.join();
