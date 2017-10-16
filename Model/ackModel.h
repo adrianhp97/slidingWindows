@@ -15,6 +15,7 @@ class ACKModel {
         this->nextSeqNum = nextSeqNum;
         advWindowSize = winSize;
         error = false;
+        checkSum = nextSeqNum + advWindowSize + ACK;
     }
 
     ACKModel(char* frame) {
@@ -22,15 +23,13 @@ class ACKModel {
         advWindowSize = frame[5];
         checkSum = frame[6];
         //error checking
-        char temp = frame[0];
-        for (int i = 1; i < 6; i++)
-            temp += frame[i];
+        char temp = frame[0] + nextSeqNum + advWindowSize;
         error = (checkSum != temp);
     }
 
     char* setFrameFormat() {
         char* frame = new char[1 + 4 + 1 + 1];
-        frame[0] = SOH;
+        frame[0] = ACK;
         frame[1] = (nextSeqNum >> 24) & 0xFF;
         frame[2] = (nextSeqNum >> 16) & 0xFF;
         frame[3] = (nextSeqNum >> 8) & 0xFF;
@@ -58,6 +57,15 @@ class ACKModel {
     }
     unsigned int getNextSeqNum() {
       return nextSeqNum;
+    }
+    bool isError(){
+        return error;
+    }
+
+    void printContent() {
+        cout << nextSeqNum << " ";
+        printf("%02hhX %02hhX ", advWindowSize, checkSum);
+        cout << endl;
     }
 };
 

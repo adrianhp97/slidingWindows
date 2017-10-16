@@ -6,6 +6,7 @@
 #include <time.h>         // For control timing
 #include <iostream>
 #include <fstream>
+#include <cerrno>
 
 using namespace std;
 
@@ -39,11 +40,13 @@ void recvMsg(int udpSocket) {
 		
 		int test = recvfrom(udpSocket, msg, 9, 0, (struct sockaddr *)&remaddr, &addrlen);
 
-		if (test > 0)
-			cout << "Received : ";
-		for (int i = 0; i < 9; i++)
-			printf("%02hhX ", msg[i]);
-		cout << endl;
+		cout << "Received a message" << endl;
+
+		// if (test > 0)
+		// 	cout << "Received : ";
+		// for (int i = 0; i < 9; i++)
+		// 	printf("%02hhX ", msg[i]);
+		// cout << endl;
 
 		messgModel temp(msg);
 		//temp.printContent();
@@ -54,9 +57,10 @@ void recvMsg(int udpSocket) {
 			//send ACK
 			ACKModel tempAck(temp.getSeqNum()+1, 4);
 			char* msg = tempAck.setFrameFormat();
-			for (int i = 0; i < 7; i++)
-				printf("%02hhX ", msg[i]);
-			cout << endl;
+			if (sendto(udpSocket, msg, 7, 0, (struct sockaddr *)&remaddr, sizeof(remaddr)) < 0)
+				cout << errno << endl;
+			else
+				cout << "sending ACK : " << tempAck.getNextSeqNum() << endl;	
 		}
 			
 		// TransmitterFrame frame(msg);
