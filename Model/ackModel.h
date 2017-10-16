@@ -6,7 +6,7 @@
 class ACKModel {
   private:
     unsigned char advWindowSize;
-    char checkSum;
+    unsigned char checkSum;
     unsigned int nextSeqNum;
     bool error;
 
@@ -18,17 +18,17 @@ class ACKModel {
         checkSum = nextSeqNum + advWindowSize + ACK;
     }
 
-    ACKModel(char* frame) {
+    ACKModel(unsigned char* frame) {
         nextSeqNum = (frame[1] << 24) + (frame[2] << 16) + (frame[3] << 8) + (frame[4]);
         advWindowSize = frame[5];
         checkSum = frame[6];
         //error checking
-        char temp = frame[0] + nextSeqNum + advWindowSize;
+        unsigned char temp = frame[0] + nextSeqNum + advWindowSize;
         error = (checkSum != temp);
     }
 
-    char* setFrameFormat() {
-        char* frame = new char[1 + 4 + 1 + 1];
+    unsigned char* setFrameFormat() {
+        unsigned char* frame = new unsigned char[1 + 4 + 1 + 1];
         frame[0] = ACK;
         frame[1] = (nextSeqNum >> 24) & 0xFF;
         frame[2] = (nextSeqNum >> 16) & 0xFF;
@@ -43,7 +43,7 @@ class ACKModel {
     void setAdvWindowSize(unsigned char winSize) {
         advWindowSize = winSize;
     }
-    void setCheckSum(char sum) {
+    void setCheckSum(unsigned char sum) {
       checkSum = sum;
     }
     void setNextSeqNum(unsigned int nextNum) {
@@ -52,7 +52,7 @@ class ACKModel {
     unsigned char getAdvWindowSize() {
       return advWindowSize;
     }
-    char getCheckSum() {
+    unsigned char getCheckSum() {
       return checkSum;
     }
     unsigned int getNextSeqNum() {

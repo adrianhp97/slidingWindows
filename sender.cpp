@@ -11,64 +11,78 @@
 #include <unistd.h>
 #include "Model/messgModel.h"
 #include "Model/ackModel.h"
-#include <mutex>
 #include <thread>
 #include <chrono>
 #include <vector>
+#include <mutex>
 
 using namespace std;
+
+typedef struct {
+	int waktu;
+	unsigned int frameId;
+	messgModel frame;
+} timeoutframe;
 
 int fd; //socket UDP
 int SERVICE_PORT = 21234;   //port receiver
 char* server = "127.0.0.1";   //receiver's address
 char* filename = "test.txt";
 struct sockaddr_in myaddr, remaddr;
-const int WINDOW_SIZE = 4;
-int seqNum = 0;
-vector<char> buffer;
+unsigned int WINDOW_SIZE = 4;
+unsigned int seqNum = 0;
+vector<unsigned char> buffer;
+vector<timeoutframe> timeout;
+unsigned int LAR = 0; //last acknowledgement received
+unsigned int LFS = 0; //last frame sent
+bool bufferReceiverFull = false;
+int ACK_TIMEOUT = 3;  // timeout 2 detik
+mutex key;
 
 void sendSingleFrame(messgModel frame) {
-	char* msg = frame.setFrameFormat();
-	// for (int i = 0; i < strlen(msg); i++)
-	// 	cout << msg[i];
-	// cout << endl;
-	// timeFrame temp;
-	// temp.waktu = time(0);
-	// temp.frameNum = frame.getFrameNumber();
-	// timeBuffer.push_back(temp);
-	cout << "Sending : " << frame.getSeqNum() << endl;
-	int temp = sendto(fd, msg, 9, 0, (struct sockaddr *)&remaddr, sizeof(remaddr));
-	// if (temp < 0)
-	// 	cout << errno << endl;
-	// else
-	// 	cout << "sending succeded" << endl;	
+	timeoutframe temp;
+	temp.waktu = time(0);  //get current time
+	temp.frameId = frame.getSeqNum();
+	temp.frame = frame;
+	timeout.push_back(temp);
+
+	unsigned char* msg = frame.setFrameFormat();
+	cout << "SYNC " << frame.getSeqNum() << endl;
+	sendto(fd, msg, 9, 0, (struct sockaddr *)&remaddr, sizeof(remaddr));
 }
 
 void sendBuffer() {
-    // mtx.lock();
+	//wait until it's empty
+	while (bufferReceiverFull) {
+		std::this_thread::sleep_for(std::chrono::milliseconds(500));
+		cout << "Waiting for receiver buffer... " << endl;
+	}
+
     while (!buffer.empty()) {
-    	int size = (buffer.size() >= 4) ? WINDOW_SIZE : buffer.size();
-    	for (int i = 0; i < size; i++) {
-    		sleep(1);
-	    	messgModel sendThis(seqNum++);
-	    	sendThis.setData(buffer.front()); 
-			sendSingleFrame(sendThis);
-			buffer.erase(buffer.begin());
-		}
-    } 
-	// mtx.unlock();
+    	std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    	//cout << LFS << " " << LAR << " " << LFS - LAR << endl;
+    	while ((LFS < LAR) || (LFS - LAR) < (WINDOW_SIZE - 1)) {
+    		if (buffer.empty())
+    			break;
+    		else {
+    			LFS = seqNum; //update last frame sent
+		    	messgModel sendThis(seqNum++);
+		    	sendThis.setData(buffer.front()); 
+				sendSingleFrame(sendThis);
+				buffer.erase(buffer.begin());
+    		}
+    	} 
+    }
 }
 
 void readToBuffer(char* filename) {
 	ifstream fin(filename);	
-    char temp;	
+    unsigned char temp;	
 
     cout << "Filling buffer with data ..." << endl;
 	fin >> temp;
 	while (!fin.eof()) {
-		sleep(1);
 		if (buffer.size() <= BUFFER_SIZE) {
-			printf("read : %c\n", temp);
 			buffer.push_back(temp);
 			fin >> temp;
 		}
@@ -78,24 +92,59 @@ void readToBuffer(char* filename) {
 		}
 	}
 	if (!buffer.empty()) {
-		cout << "Transmitting the rest of buffer data";
+		cout << "Transmitting the rest of buffer data" << endl;
 		sendBuffer();
 	}
-
 	fin.close();
+}
+
+// Find timeoutframe with frameid equals to num
+vector<timeoutframe>::iterator findtimeoutframe(unsigned int num) {
+	for (vector<timeoutframe>::iterator it=timeout.begin(); it < timeout.end(); it++) {
+		if (it->frameId == num) 
+			return it;
+	}
+	return timeout.begin();
 }
 
 void recvSign() {
   while(1) {
-  	sleep(1);
-  	char* sign = new char [7];
+  	unsigned char* sign = new unsigned char [7];
     recvfrom(fd, sign, 7, 0, NULL, NULL);
     ACKModel frame(sign);
     // frame.printContent();
  	// timeBuffer.erase(timeBuffer.begin());
- 	printf("ACK %d\n", frame.getNextSeqNum());	
+ 	// if receiver's buffer can't contain window
+ 	if (frame.getAdvWindowSize() < WINDOW_SIZE) {
+ 		bufferReceiverFull = true;
+ 		cout << "buffer's receiver is full" << endl;
+ 	}
+ 	else {
+ 		timeout.erase(findtimeoutframe(frame.getNextSeqNum() - 1));
+
+ 		bufferReceiverFull = false;
+ 		LAR = frame.getNextSeqNum();
+ 		cout << "ACK " << frame.getNextSeqNum() << endl;
+ 	}
   }
 }
+
+// Resend data if timeout
+void checkTimeout() {
+	sleep(2);
+	while (true) {
+		if (!timeout.empty()) {
+			for (int i = 0; i < timeout.size(); i++) {
+				int now = time(0);
+				if ((now - timeout[i].waktu) > ACK_TIMEOUT) {
+					sendSingleFrame(timeout[i].frame);
+					timeout.erase(timeout.begin() + i);
+				}
+			}
+		}
+	}
+}
+
 
 int main() {
 	if ((fd = socket(PF_INET, SOCK_DGRAM, 0))==-1)
@@ -123,7 +172,9 @@ int main() {
 
 	thread th1(recvSign);
 	thread th2(readToBuffer, filename);
+	thread th3(checkTimeout);
 
 	th1.join();
 	th2.join();
+	th3.join();
 }

@@ -8,6 +8,7 @@
 #include <fstream>
 #include <cerrno>
 #include <vector>
+#include <unistd.h>
 
 #include "Model/messgModel.h"
 #include "Model/ackModel.h"
@@ -20,9 +21,10 @@ struct sockaddr_in remaddr;            // sender address
 socklen_t addrlen = sizeof(remaddr);  /* length of addresses */
 int SERVICE_PORT = 21234;
 char* filename = "receive.txt";
-const int WINDOW_SIZE = 4;
-int seqNum = 0;
-vector<char> buffer;
+const unsigned int WINDOW_SIZE = 4;
+vector<unsigned char> buffer;
+unsigned int NFE = 0; //next frame expected
+unsigned int LFA = WINDOW_SIZE - 1; //largest frame acceptable
 
 void writeToFile(char* filename) {
 	ofstream fout;
@@ -30,16 +32,16 @@ void writeToFile(char* filename) {
 	
 	while (!buffer.empty()) {
 		fout << buffer.front();
-		cout << "Writing : " << buffer.front() << endl;
+		//cout << "Writing : " << buffer.front() << endl;
 		buffer.erase(buffer.begin());
 	}
 }
 
-void storeInBuffer(char msg) {
+void storeInBuffer(unsigned char msg) {
 	buffer.push_back(msg);
-	cout << "store in buffer : " << msg << endl;
+	//cout << "store in buffer : " << msg << endl;
 	if (buffer.size() == BUFFER_SIZE) {
-		cout << "buffer is full, empty it with writing to file" << endl;
+		cout << "buffer is full, empty it by writing to file" << endl;
 		writeToFile(filename);
 	}
 	else
@@ -50,14 +52,14 @@ void storeInBuffer(char msg) {
 }
 
 void recvMsg(int udpSocket) {
-	char msg[9];
+	unsigned char msg[9];
 	//bool approved[WINDOW_SIZE+1];
 	//setAllFalse(approved, WINDOW_SIZE);
 	printf("Waiting on port %d\n", SERVICE_PORT);
 	while (true) {
 		int test = recvfrom(udpSocket, msg, 9, 0, (struct sockaddr *)&remaddr, &addrlen);
-		if (test > 0)
-			cout << "Received a message" << endl;
+		// if (test > 0)
+		// 	cout << "Received a message" << endl;
 
 		// for (int i = 0; i < 9; i++)
 		// 	printf("%02hhX ", msg[i]);
@@ -69,9 +71,17 @@ void recvMsg(int udpSocket) {
 			cout << "Error detected -> message rejected" << endl;
 		else {
 			storeInBuffer(temp.getData());
+			
+			if (temp.getSeqNum() == NFE) { //as expected then accepted
+				NFE++;
+				LFA++;
+			}
+			//else, send ACK of expected frame 
+
+			ACKModel tempAck(NFE, BUFFER_SIZE - buffer.size());
+			unsigned char* msg = tempAck.setFrameFormat();
+
 			//send ACK
-			ACKModel tempAck(temp.getSeqNum()+1, 4);
-			char* msg = tempAck.setFrameFormat();
 			if (sendto(udpSocket, msg, 7, 0, (struct sockaddr *)&remaddr, sizeof(remaddr)) < 0)
 				cout << errno << endl;
 			else

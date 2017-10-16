@@ -9,30 +9,33 @@ using namespace std;
 
 class messgModel {
   private:
-    char data;
-    char checkSum;
+    unsigned char data;
+    unsigned char checkSum;
     unsigned int sequenceNum;
     bool error;
 
   public:
+    messgModel() {
+    }
+
     messgModel(unsigned int seqNum) {
         sequenceNum = seqNum;
         error = false;
     };
 
-    messgModel(char* frame) {
+    messgModel(unsigned char* frame) {
         sequenceNum = (frame[1] << 24) + (frame[2] << 16) + (frame[3] << 8) + (frame[4]);
         data = frame[6];
         checkSum = frame[8];
         //error checking
-        char temp = frame[0];
+        unsigned char temp = frame[0];
         for (int i = 1; i <= 7; i++)
             temp += frame[i];
         error = (checkSum != temp);
     }
 
-    char* setFrameFormat() {
-        char* frame = new char[1 + 4 + 1 + 1 + 1 + 1];
+    unsigned char* setFrameFormat() {
+        unsigned char* frame = new unsigned char[1 + 4 + 1 + 1 + 1 + 1];
         frame[0] = SOH;
         frame[1] = (sequenceNum >> 24) & 0xFF;
         frame[2] = (sequenceNum >> 16) & 0xFF;
@@ -46,7 +49,7 @@ class messgModel {
         return frame;
     }
 
-    void setData(char data) {
+    void setData(unsigned char data) {
         this->data = data;
         //now able to set checksum
         this->checkSum = SOH + sequenceNum + STX + data + ETX;
@@ -56,10 +59,10 @@ class messgModel {
         sequenceNum = num;
     };
 
-    char getData() {
+    unsigned char getData() {
         return data;
     };
-    char getCheckSum() {
+    unsigned char getCheckSum() {
         return checkSum;
     }
     unsigned int getSeqNum() {
