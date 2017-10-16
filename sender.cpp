@@ -22,6 +22,7 @@ struct sockaddr_in myaddr, remaddr;
 char* dataFromFile;
 const int WINDOW_SIZE = 4;
 int seqNum = 0;
+char buffer[256];
 
 void readFileAndStore(char* filename) {
 	ifstream fin(filename);	
@@ -35,6 +36,35 @@ void readFileAndStore(char* filename) {
 	}
 
 	fin.close();
+}
+
+void readBuffer(int fd, char* filename) {
+	ifstream fin(filename);	
+    char temp;
+    int nMsg = 0;	
+
+	fin >> temp;
+	while (!fin.eof()) {
+		if (nMsg < 256) {
+			buffer[nMsg++] = temp;
+			fin >> temp;
+		}
+		else {
+			sendBuffer(buffer);
+			nMsg = 0;
+		}
+	}
+
+	fin.close();
+}
+
+void sendBuffer(int fd) {
+	int nMsg = 0;
+	while (nMsg < 256) {
+		messgModel frame(nMsg);
+		frame.setData(buffer[nMsg]); 
+		sendSingleFrame(fd, frame);
+	}
 }
 
 
