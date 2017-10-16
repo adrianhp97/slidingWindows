@@ -18,6 +18,7 @@ int clientSocket;
 int portNum;                    // port number
 struct sockaddr_in myaddr, remaddr;
 char* dataFromFile;
+char buffer[256];
 
 void readFileAndStore(char* filename) {
 	ifstream fin(filename);	
@@ -28,6 +29,26 @@ void readFileAndStore(char* filename) {
 	while (!fin.eof()) {
 		dataFromFile[nMsg++] = temp;
 		fin >> temp;
+	}
+
+	fin.close();
+}
+
+void readBuffer(char* filename) {
+	ifstream fin(filename);	
+    char temp;
+    int nMsg = 0;	
+
+	fin >> temp;
+	while (!fin.eof()) {
+		if (nMsg <= 256) {
+			buffer[nMsg++] = temp;
+			fin >> temp;
+		}
+		else {
+			sendBuffer(buffer);
+			nMsg = 0;
+		}
 	}
 
 	fin.close();
