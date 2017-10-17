@@ -25,11 +25,12 @@ typedef struct {
 } timeoutframe;
 
 int fd; //socket UDP
-int SERVICE_PORT = 21234;   //port receiver
-char* server = "127.0.0.1";   //receiver's address
-char* filename = "test.txt";
+int SERVICE_PORT;   //port receiver
+char* server;   //receiver's address
+char* filename;
 struct sockaddr_in myaddr, remaddr;
-unsigned int WINDOW_SIZE = 4;
+unsigned int WINDOW_SIZE;
+unsigned int BUFFER_SIZE;
 unsigned int seqNum = 0;
 vector<unsigned char> buffer;
 vector<timeoutframe> timeout;
@@ -44,7 +45,10 @@ void sendSingleFrame(messgModel frame) {
 	temp.waktu = time(0);  //get current time
 	temp.frameId = frame.getSeqNum();
 	temp.frame = frame;
+	
+	key.lock();
 	timeout.push_back(temp);
+	key.unlock();
 
 	unsigned char* msg = frame.setFrameFormat();
 	cout << "SYNC " << frame.getSeqNum() << endl;
@@ -52,39 +56,47 @@ void sendSingleFrame(messgModel frame) {
 }
 
 void sendBuffer() {
-	//wait until it's empty
-	while (bufferReceiverFull) {
-		std::this_thread::sleep_for(std::chrono::milliseconds(500));
-		cout << "Waiting for receiver buffer... " << endl;
-	}
-
     while (!buffer.empty()) {
-    	std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    	std::this_thread::sleep_for(std::chrono::milliseconds(200));
     	//cout << LFS << " " << LAR << " " << LFS - LAR << endl;
-    	while ((LFS < LAR) || (LFS - LAR) < (WINDOW_SIZE - 1)) {
-    		if (buffer.empty())
+    	while ((LFS < LAR) || ((LFS - LAR) < WINDOW_SIZE)) {
+    		if (buffer.empty() || bufferReceiverFull) {
     			break;
+    		}
     		else {
     			LFS = seqNum; //update last frame sent
-		    	messgModel sendThis(seqNum++);
+    			messgModel sendThis(seqNum++);
 		    	sendThis.setData(buffer.front()); 
 				sendSingleFrame(sendThis);
+				key.lock();
 				buffer.erase(buffer.begin());
+				key.unlock();
     		}
     	} 
+    	if (bufferReceiverFull) {
+			LFS = seqNum; //update last frame sent
+			messgModel sendThis(seqNum++);
+	    	sendThis.setData(buffer.front()); 
+			sendSingleFrame(sendThis);
+			key.lock();
+			buffer.erase(buffer.begin());
+			key.unlock();
+    	}
     }
 }
 
 void readToBuffer(char* filename) {
 	ifstream fin(filename);	
-    unsigned char temp;	
+    unsigned char temp;		
 
     cout << "Filling buffer with data ..." << endl;
 	fin >> temp;
 	while (!fin.eof()) {
 		if (buffer.size() <= BUFFER_SIZE) {
+			key.lock();
 			buffer.push_back(temp);
 			fin >> temp;
+			key.unlock();
 		}
 		else {
 			cout << "Buffer full, emptying buffer by transmitting the data" << endl;
@@ -96,6 +108,7 @@ void readToBuffer(char* filename) {
 		sendBuffer();
 	}
 	fin.close();
+	cout << "Done." << endl;
 }
 
 // Find timeoutframe with frameid equals to num
@@ -112,41 +125,58 @@ void recvSign() {
   	unsigned char* sign = new unsigned char [7];
     recvfrom(fd, sign, 7, 0, NULL, NULL);
     ACKModel frame(sign);
-    // frame.printContent();
- 	// timeBuffer.erase(timeBuffer.begin());
+
+    key.lock();
+    timeout.erase(findtimeoutframe(frame.getNextSeqNum() - 1));
+	LAR = frame.getNextSeqNum()-1;
+	key.unlock();
+	cout << "ACK " << frame.getNextSeqNum() << endl;
+
  	// if receiver's buffer can't contain window
- 	if (frame.getAdvWindowSize() < WINDOW_SIZE) {
+ 	key.lock();
+ 	if (frame.getAdvWindowSize() <= 1) {
  		bufferReceiverFull = true;
  		cout << "buffer's receiver is full" << endl;
  	}
  	else {
- 		timeout.erase(findtimeoutframe(frame.getNextSeqNum() - 1));
-
  		bufferReceiverFull = false;
- 		LAR = frame.getNextSeqNum();
- 		cout << "ACK " << frame.getNextSeqNum() << endl;
  	}
+ 	key.unlock();
   }
 }
 
 // Resend data if timeout
 void checkTimeout() {
-	sleep(2);
 	while (true) {
 		if (!timeout.empty()) {
 			for (int i = 0; i < timeout.size(); i++) {
 				int now = time(0);
-				if ((now - timeout[i].waktu) > ACK_TIMEOUT) {
+				if ((now - timeout[i].waktu < 1000000) && ((now - timeout[i].waktu) > ACK_TIMEOUT)) {
+					cout << "Frame " << timeout[i].frameId << " timeout , resending" << endl;
 					sendSingleFrame(timeout[i].frame);
+					key.lock();
 					timeout.erase(timeout.begin() + i);
+					key.unlock();
 				}
+				//std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 			}
 		}
 	}
 }
 
 
-int main() {
+int main(int argc, char** argv) {
+	if (argc < 6) {
+		perror("<filename> <windowsize> <buffersize> <ip> <port>");
+		exit(1);
+	}
+
+	filename = argv[1];
+	WINDOW_SIZE = atoi(argv[2]);
+	BUFFER_SIZE = atoi(argv[3]);
+	server = argv[4];
+	SERVICE_PORT = atoi(argv[5]);
+
 	if ((fd = socket(PF_INET, SOCK_DGRAM, 0))==-1)
 		printf("socket created\n");
 

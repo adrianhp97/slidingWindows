@@ -9,6 +9,7 @@
 #include <cerrno>
 #include <vector>
 #include <unistd.h>
+#include <cerrno>
 
 #include "Model/messgModel.h"
 #include "Model/ackModel.h"
@@ -19,9 +20,10 @@ int udpSocket;
 struct sockaddr_in myaddr;            // this address
 struct sockaddr_in remaddr;            // sender address
 socklen_t addrlen = sizeof(remaddr);  /* length of addresses */
-int SERVICE_PORT = 21234;
-char* filename = "receive.txt";
-const unsigned int WINDOW_SIZE = 4;
+int SERVICE_PORT;
+char* filename;
+unsigned int WINDOW_SIZE;
+unsigned int BUFFER_SIZE;
 vector<unsigned char> buffer;
 unsigned int NFE = 0; //next frame expected
 unsigned int LFA = WINDOW_SIZE - 1; //largest frame acceptable
@@ -57,16 +59,10 @@ void recvMsg(int udpSocket) {
 	//setAllFalse(approved, WINDOW_SIZE);
 	printf("Waiting on port %d\n", SERVICE_PORT);
 	while (true) {
+		//std::this_thread::sleep_for(std::chrono::milliseconds(500));
 		int test = recvfrom(udpSocket, msg, 9, 0, (struct sockaddr *)&remaddr, &addrlen);
-		// if (test > 0)
-		// 	cout << "Received a message" << endl;
-
-		// for (int i = 0; i < 9; i++)
-		// 	printf("%02hhX ", msg[i]);
-		// cout << endl;
 
 		messgModel temp(msg);
-		//temp.printContent();
 		if (temp.isError())
 			cout << "Error detected -> message rejected" << endl;
 		else {
@@ -87,31 +83,21 @@ void recvMsg(int udpSocket) {
 			else
 				cout << "sending ACK : " << tempAck.getNextSeqNum() << endl;	
 		}
-			
-		// TransmitterFrame frame(msg);
-		// //printf("Frame : "); frame.printBytes();
-		// if(!frame.isError()) {
-		// 	sendACK(frame.getFrameNumber(), udpSocket);
-		// 	//cout << frame.getData() <<endl;
-		// 	if(!approved[frame.getFrameNumber()]) {
-		// 		//cout << frame.getData() <<endl;
-		// 		buffer.push_back(frame);
-		// 		//printf("Frame Number : ");
-		// 		//printf("%d\n", buffer.top().getFrameNumber()); 
-		// 		//cout << buffer.size() << endl;
-		// 		approved[frame.getFrameNumber()] = true;
-		// 		if(isAllTrue(approved, WINDOW_SIZE+1)) {
-		// 			setAllFalse(approved, WINDOW_SIZE+1);
-		// 		}
-		// 	}
-		// } else {
-		// 	sendNAK(frame.getFrameNumber(), udpSocket);
-		// }
 	}
 } 
 
 
-int main() {
+int main(int argc, char** argv) {
+	if (argc < 5) {
+		perror("<filename> <windowsize> <buffersize> <port>");
+		exit(1);
+	}
+
+	filename = argv[1];
+	WINDOW_SIZE = atoi(argv[2])	;
+	BUFFER_SIZE = atoi(argv[3]);
+	SERVICE_PORT = atoi(argv[4]);
+
 	int fd;
 	/* create a UDP socket */
 	if ((fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
@@ -125,7 +111,7 @@ int main() {
 	myaddr.sin_port = htons(SERVICE_PORT);
 
 	if (bind(fd, (struct sockaddr *)&myaddr, sizeof(myaddr)) < 0) { 
-		cout << "bind failed : " << endl;
+		cout << "bind failed : " << errno << endl;
 		return 0; 
 	}
 

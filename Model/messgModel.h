@@ -28,9 +28,7 @@ class messgModel {
         data = frame[6];
         checkSum = frame[8];
         //error checking
-        unsigned char temp = frame[0];
-        for (int i = 1; i <= 7; i++)
-            temp += frame[i];
+        unsigned char temp = frame[0] + sequenceNum + frame[5] + frame[6] + frame[7];
         error = (checkSum != temp);
     }
 
