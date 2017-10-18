@@ -1,0 +1,55 @@
+    0                   1                   2                   3   
+    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |          Source Port          |       Destination Port        |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |                        Sequence Number                        |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |                    Acknowledgment Number                      |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |  Data |           |U|A|P|R|S|F|                               |
+   | Offset| Reserved  |R|C|S|S|Y|I|            Window             |
+   |       |           |G|K|H|T|N|N|                               |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |           Checksum            |         Urgent Pointer        |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |                    Options                    |    Padding    |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |                             data                              |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+                            TCP Header Format
+
+          
+
+Source Port (16 bits) : port sumber
+
+Destination Port (16 bits) : port tujuan
+
+Sequence Number (32 bits) : 
+
+Acknowledgment Number (32 bits) : Field ini berisi sequence number selanjutnya
+
+Data Offset (4 bits) : Menunujkkan besarnya TCP header dalam 32-bit words.
+
+Reserved (6 bits) : digunakan untuk keperluan yang akan datang dan harus dibuat 0
+
+Control Bits/Flags (6 bits) :
+
+    URG:  Urgent Pointer field significant
+    ACK:  Acknowledgment field significant
+    PSH:  Push Function
+    RST:  Reset the connection
+    SYN:  Synchronize sequence numbers
+    FIN:  No more data from sender
+
+Window (16 bits) : ukuran dari window receiver, yang menentukan jumlah unit yang mau diterima
+
+Checksum (16 bits) : digunakan untuk error-checking dari header
+
+Urgent Pointer (16 bits) : merupakan offset penunjuk byte urgent data terakhir
+
+Options (Variable 0–320 bits, divisible by 32) : 
+
+Padding (variable) : digunakan untuk memastikan ujung TCP Header dan data dimulai pada batas 32 bit 
+
